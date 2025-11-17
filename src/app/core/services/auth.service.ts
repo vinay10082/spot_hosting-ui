@@ -12,7 +12,7 @@ export class AuthService {
   private readonly router = inject(Router);
   private readonly API_URL = 'http://localhost:8080/v1/api/auth';
   private readonly TOKEN_KEY = 'auth_token';
-  
+
   // Using Angular signals for reactive state management
   currentUser = signal<User | null>(null);
   isAuthenticated = signal<boolean>(false);
@@ -57,9 +57,10 @@ export class AuthService {
     const token = this.getAuthToken();
     if (token) {
       this.isAuthenticated.set(true);
-      // Optionally: validate token with backend
+      // Optionally, fetch user details from the server using the token
     }
   }
+
 
   private handleError(error: any): Observable<never> {
     console.error('Auth error:', error);
