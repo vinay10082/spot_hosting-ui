@@ -15,6 +15,7 @@ import { ComponentRegistryService } from '../../../../core/services/component-re
           <h4>{{ category | titlecase }}</h4>
           <div class="component-list" 
                cdkDropList
+               [id]="'sidebar-' + category"
                [cdkDropListData]="componentsByCategory()[category]"
                [cdkDropListConnectedTo]="['canvas-root']"
                [cdkDropListSortingDisabled]="true"
@@ -63,6 +64,7 @@ import { ComponentRegistryService } from '../../../../core/services/component-re
       display: flex;
       flex-direction: column;
       gap: 8px;
+      min-height: 50px;
     }
 
     .component-item {
@@ -93,13 +95,16 @@ import { ComponentRegistryService } from '../../../../core/services/component-re
     .cdk-drag-preview {
       padding: 12px;
       background: white;
-      border: 1px solid #007bff;
+      border: 2px solid #007bff;
       border-radius: 4px;
       box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .cdk-drop-list-dragging .component-item:not(.cdk-drag-placeholder) {
-      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+    .cdk-drag-placeholder {
+      opacity: 0;
     }
   `]
 })
@@ -112,6 +117,10 @@ export class SidebarComponent {
   constructor(private componentRegistry: ComponentRegistryService) {}
 
   onComponentDrop(event: CdkDragDrop<any>) {
-    this.componentDropped.emit(event);
+    // This prevents items from being reordered in sidebar
+    // Only emit when dropping to canvas
+    if (event.previousContainer !== event.container) {
+      this.componentDropped.emit(event);
+    }
   }
 }

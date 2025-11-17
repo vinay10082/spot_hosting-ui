@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, copyArrayItem, moveItemInArray } from '@angular/cdk/drag-drop';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { EditorCanvasComponent } from './components/editor-canvas/editor-canvas.component';
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel.component';
@@ -45,15 +45,12 @@ import { ComponentDefinition } from '../../core/models/component.model';
       </div>
 
       <div class="editor-content">
-        <app-sidebar
-          (componentDropped)="onComponentDropped($event)">
-        </app-sidebar>
+        <app-sidebar></app-sidebar>
 
         <app-editor-canvas
           [components]="components()"
           [selectedComponentId]="selectedComponentId()"
           [responsiveMode]="responsiveMode()"
-          [connectedDropLists]="['canvas-root']"
           (componentDropped)="onCanvasDropped($event)"
           (componentSelected)="onComponentSelected($event)">
         </app-editor-canvas>
@@ -140,28 +137,29 @@ export class EditorComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Load saved state if exists
     this.loadState();
   }
 
-  onComponentDropped(event: CdkDragDrop<any>): void {
-    if (event.previousContainer !== event.container) {
+  onCanvasDropped(event: CdkDragDrop<any>): void {
+    console.log('Editor handling drop event:', event);
+    
+    // Check if dragging from sidebar to canvas
+    if (event.previousContainer.id.startsWith('sidebar-')) {
+      // Dragging from sidebar - create new component
       const definition = event.item.data as ComponentDefinition;
       const newComponent = this.componentRegistry.createInstance(definition.type);
       
       if (newComponent) {
+        console.log('Creating new component:', newComponent);
         this.editorState.dispatch({
           type: 'ADD_COMPONENT',
           payload: { component: newComponent },
         });
       }
-    }
-  }
-
-  onCanvasDropped(event: CdkDragDrop<any>): void {
-    // Handle reordering or moving components within canvas
-    if (event.previousContainer === event.container) {
+    } else if (event.previousContainer === event.container) {
+      // Reordering within canvas
       const component = event.item.data;
+      console.log('Reordering component:', component);
       this.editorState.dispatch({
         type: 'MOVE_COMPONENT',
         payload: {
@@ -192,7 +190,6 @@ export class EditorComponent implements OnInit {
   }
 
   private loadState(): void {
-    // Load from localStorage or API
     const saved = localStorage.getItem('editor-state');
     if (saved) {
       const state = JSON.parse(saved);
