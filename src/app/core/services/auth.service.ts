@@ -1,68 +1,33 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
-import { Observable, tap, catchError, throwError } from 'rxjs';
-import { AuthResponse, LoginRequest, RegisterRequest, User } from '../models/user.model';
+import { Observable } from 'rxjs';
+import { AuthResponse, LoginRequest, RegisterRequest } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
   private readonly API_URL = 'http://localhost:8080/v1/api/auth';
-  private readonly TOKEN_KEY = 'auth_token';
-  
-  // Using Angular signals for reactive state management
-  currentUser = signal<User | null>(null);
-  isAuthenticated = signal<boolean>(false);
 
-  constructor() {
-    this.checkAuth();
-  }
+  constructor(private http: HttpClient) {}
 
   register(data: RegisterRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/register`, data).pipe(
-      tap(response => this.handleAuthSuccess(response)),
-      catchError(error => this.handleError(error))
-    );
+    return this.http.post<AuthResponse>(`${this.API_URL}/register`, data);
   }
 
   login(data: LoginRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/login`, data).pipe(
-      tap(response => this.handleAuthSuccess(response)),
-      catchError(error => this.handleError(error))
-    );
+    return this.http.post<AuthResponse>(`${this.API_URL}/login`, data);
   }
 
   logout(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
-    this.currentUser.set(null);
-    this.isAuthenticated.set(false);
-    this.router.navigate(['/auth/login']);
+    localStorage.removeItem('auth_token');
   }
 
   getAuthToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
+    return localStorage.getItem('auth_token');
   }
 
-  private handleAuthSuccess(response: AuthResponse): void {
-    localStorage.setItem(this.TOKEN_KEY, response.token);
-    this.currentUser.set(response.user);
-    this.isAuthenticated.set(true);
-    this.router.navigate(['/dashboard']);
-  }
-
-  private checkAuth(): void {
-    const token = this.getAuthToken();
-    if (token) {
-      this.isAuthenticated.set(true);
-      // Optionally: validate token with backend
-    }
-  }
-
-  private handleError(error: any): Observable<never> {
-    console.error('Auth error:', error);
-    return throwError(() => error);
+  saveAuthToken(token: string): void {
+    localStorage.setItem('auth_token', token);
   }
 }
