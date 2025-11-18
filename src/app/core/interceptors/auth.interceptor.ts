@@ -1,25 +1,32 @@
-import { HttpInterceptorFn } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { AuthService } from '../services/auth.service';
+import { Injectable } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { Store } from '@ngrx/store';
+import { AuthActions } from '../../store/auth/auth.action';
 
-export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const authService = inject(AuthService);
-  const token = authService.getAuthToken();
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private store: Store) {}
 
-  // Skip auth header for login and register endpoints
-  if (req.url.includes('/auth/login') || req.url.includes('/auth/register')) {
-    return next(req);
+  intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = localStorage.getItem('auth_token');
+
+    if (token) {
+      request = request.clone({
+        setHeaders: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+    }
+
+    return next.handle(request).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401) {
+          this.store.dispatch(AuthActions.logout());
+        }
+        return throwError(() => error);
+      })
+    );
   }
-
-  // Clone request and add authorization header
-  if (token) {
-    const clonedReq = req.clone({
-      setHeaders: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    return next(clonedReq);
-  }
-
-  return next(req);
-};
+}

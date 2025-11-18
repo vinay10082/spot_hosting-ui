@@ -57,3 +57,29 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+
+## NgRx Architecture
+
+State Structure:
+
+```
+{
+  auth: {
+    user: User | null,
+    token: string | null,
+    isAuthenticated: boolean,
+    loading: boolean,
+    error: string | null
+  },
+  editor: {
+    components: ComponentInstance[],
+    selectedComponentId: string | null,
+    history: { past, present, future },
+    responsiveMode: 'desktop' | 'tablet' | 'mobile',
+    isDirty: boolean,
+    loading: boolean,
+    error: string | null
+  }
+}
+```
