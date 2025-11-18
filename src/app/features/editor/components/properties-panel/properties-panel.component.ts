@@ -1,155 +1,162 @@
-import { Component, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { EditorStateService } from '../../../../core/services/editor-state.service';
+import { Component, OnInit } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { selectSelectedComponent } from '../../../../store/editor/editor.selector';
+import { EditorActions } from '../../../../store/editor/editor.action';
 import { ComponentRegistryService } from '../../../../core/services/component-registry.service';
-import { DynamicFormComponent } from '../../../../shared/components/dynamic-form/dynamic-form.component';
 
 @Component({
+  standalone: false,
   selector: 'app-properties-panel',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, DynamicFormComponent],
-  template: `
-    <div class="properties-panel">
-      @if (selectedComponent(); as component) {
-        <div class="panel-header">
-          <h3>Properties</h3>
-          <span class="component-type">{{ component.type }}</span>
-        </div>
+  template: `<div class="properties-panel">
+  <h3 class="panel-title">Properties</h3>
 
-        <div class="responsive-toggle">
-          <button 
-            [class.active]="responsiveMode() === 'desktop'"
-            (click)="setResponsiveMode('desktop')">
-            <span class="material-icons">desktop_windows</span>
-          </button>
-          <button 
-            [class.active]="responsiveMode() === 'tablet'"
-            (click)="setResponsiveMode('tablet')">
-            <span class="material-icons">tablet</span>
-          </button>
-          <button 
-            [class.active]="responsiveMode() === 'mobile'"
-            (click)="setResponsiveMode('mobile')">
-            <span class="material-icons">phone_android</span>
-          </button>
-        </div>
-
-        <!-- FIX: Add null check here -->
-        @if (componentDefinition(); as definition) {
-          <app-dynamic-form
-            [componentDefinition]="definition"
-            [initialValues]="component.props"
-            (valueChange)="onPropertyChange($event)">
-          </app-dynamic-form>
-        }
-      } @else {
-        <div class="empty-state">
-          <p>Select a component to edit its properties</p>
-        </div>
-      }
+  <ng-container *ngIf="selectedComponent$ | async as component; else noSelection">
+    <div class="component-header">
+      <div class="component-info">
+        <strong>{{ getComponentDefinition(component.type)?.name || component.type }}</strong>
+        <span class="component-id">{{ component.id }}</span>
+      </div>
+      <div class="component-actions">
+        <button 
+          class="btn-icon-small"
+          (click)="onDuplicateComponent(component.id)"
+          title="Duplicate">
+          📋
+        </button>
+        <button 
+          class="btn-icon-small btn-danger"
+          (click)="onDeleteComponent(component.id)"
+          title="Delete">
+          🗑️
+        </button>
+      </div>
     </div>
-  `,
-  styles: [`
-    .properties-panel {
-      width: 320px;
-      background: white;
-      border-left: 1px solid #e0e0e0;
-      padding: 16px;
-      overflow-y: auto;
-    }
 
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
+    <div class="property-form">
+      <app-dynamic-form
+        [componentInstance]="component"
+        [definition]="getComponentDefinition(component.type)"
+        (propertyChange)="onPropertyChange(component.id, $event.name, $event.value)">
+      </app-dynamic-form>
+    </div>
+  </ng-container>
 
-    h3 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
+  <ng-template #noSelection>
+    <div class="empty-state">
+      <p>👆 Select a component to edit its properties</p>
+    </div>
+  </ng-template>
+</div>`,
+  styles: [`.properties-panel {
+  padding: 16px;
+  flex: 1;
+  border-top: 1px solid #e0e0e0;
+}
 
-    .component-type {
-      font-size: 12px;
-      color: #666;
-      background: #f5f5f5;
-      padding: 4px 8px;
-      border-radius: 4px;
-    }
+.panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
 
-    .responsive-toggle {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      padding: 8px;
-      background: #f5f5f5;
-      border-radius: 4px;
-    }
+.component-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px;
+  background-color: #f8f8f8;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
 
-    .responsive-toggle button {
-      flex: 1;
-      padding: 8px;
-      border: none;
-      background: white;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
+.component-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-    .responsive-toggle button:hover {
-      background: #e3f2fd;
-    }
+.component-info strong {
+  font-size: 14px;
+  color: #333;
+}
 
-    .responsive-toggle button.active {
-      background: #007bff;
-      color: white;
-    }
+.component-id {
+  font-size: 11px;
+  color: #999;
+  font-family: monospace;
+}
 
-    .material-icons {
-      font-size: 20px;
-    }
+.component-actions {
+  display: flex;
+  gap: 4px;
+}
 
-    .empty-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 200px;
-      color: #999;
-      text-align: center;
-    }
-  `]
+.btn-icon-small {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background-color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.btn-icon-small:hover {
+  background-color: #e0e0e0;
+}
+
+.btn-icon-small.btn-danger:hover {
+  background-color: #ffe0e0;
+}
+
+.property-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  text-align: center;
+  color: #999;
+}
+
+.empty-state p {
+  font-size: 14px;
+}`]
 })
-export class PropertiesPanelComponent {
-  selectedComponent = computed(() => this.editorState.selectedComponent());
-  responsiveMode = computed(() => this.editorState.responsiveMode());
-  
-  componentDefinition = computed(() => {
-    const component = this.selectedComponent();
-    return component ? this.componentRegistry.getDefinitionByType(component.type) : null;
-  });
+export class PropertiesPanelComponent implements OnInit {
+  selectedComponent$ = this.store.select(selectSelectedComponent);
 
   constructor(
-    private editorState: EditorStateService,
+    private store: Store,
     private componentRegistry: ComponentRegistryService
   ) {}
 
-  onPropertyChange(props: Record<string, any>): void {
-    const component = this.selectedComponent();
-    if (component) {
-      this.editorState.dispatch({
-        type: 'UPDATE_COMPONENT',
-        payload: { id: component.id, props },
-      });
-    }
+  ngOnInit(): void {}
+
+  onPropertyChange(componentId: string, propName: string, value: any): void {
+    this.store.dispatch(EditorActions.updateComponent({
+      id: componentId,
+      props: { [propName]: value }
+    }));
   }
 
-  setResponsiveMode(mode: 'desktop' | 'tablet' | 'mobile'): void {
-    this.editorState.dispatch({
-      type: 'SET_RESPONSIVE_MODE',
-      payload: { mode },
-    });
+  onDeleteComponent(componentId: string): void {
+    this.store.dispatch(EditorActions.deleteComponent({ id: componentId }));
+  }
+
+  onDuplicateComponent(componentId: string): void {
+    this.store.dispatch(EditorActions.duplicateComponent({ id: componentId }));
+  }
+
+  getComponentDefinition(type: string) {
+    return this.componentRegistry.getDefinitionByType(type);
   }
 }

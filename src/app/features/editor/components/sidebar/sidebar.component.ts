@@ -1,126 +1,119 @@
-import { Component, output, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { CdkDragDrop, CdkDropList, CdkDrag } from '@angular/cdk/drag-drop';
+import { Component, OnInit } from '@angular/core';
+import { Store } from '@ngrx/store';
 import { ComponentRegistryService } from '../../../../core/services/component-registry.service';
+import { EditorActions } from '../../../../store/editor/editor.action';
 
 @Component({
+  standalone: false,
   selector: 'app-sidebar',
-  standalone: true,
-  imports: [CommonModule, CdkDropList, CdkDrag],
-  template: `
-    <div class="sidebar">
-      <h3>Components</h3>
-      @for (category of categories; track category) {
-        <div class="category">
-          <h4>{{ category | titlecase }}</h4>
-          <div class="component-list" 
-               cdkDropList
-               [id]="'sidebar-' + category"
-               [cdkDropListData]="componentsByCategory()[category]"
-               [cdkDropListConnectedTo]="['canvas-root']"
-               [cdkDropListSortingDisabled]="true"
-               (cdkDropListDropped)="onComponentDrop($event)">
-            @for (component of componentsByCategory()[category]; track component.id) {
-              <div class="component-item"
-                   cdkDrag
-                   [cdkDragData]="component">
-                <span class="material-icons">{{ component.icon }}</span>
-                <span>{{ component.name }}</span>
-              </div>
-            }
-          </div>
+  template: `<div class="sidebar">
+  <h3 class="sidebar-title">Components</h3>
+
+  <div class="component-categories">
+    <div 
+      *ngFor="let category of componentsByCategory | keyvalue"
+      class="category">
+      <h4 class="category-title">{{ category.key | titlecase }}</h4>
+      <div class="component-list">
+        <div 
+          *ngFor="let component of category.value"
+          class="component-item"
+          (click)="onAddComponent(component.type)"
+          title="Click to add {{ component.name }}">
+          <span class="component-icon">{{ component.icon }}</span>
+          <span class="component-name">{{ component.name }}</span>
         </div>
-      }
+      </div>
     </div>
-  `,
-  styles: [`
-    .sidebar {
-      width: 280px;
-      background: white;
-      border-right: 1px solid #e0e0e0;
-      padding: 16px;
-      overflow-y: auto;
-    }
+  </div>
+</div>`,
+  styles: [`.sidebar {
+  padding: 16px;
+}
 
-    h3 {
-      margin: 0 0 16px 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
+.sidebar-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #333;
+}
 
-    .category {
-      margin-bottom: 24px;
-    }
+.component-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-    h4 {
-      margin: 0 0 12px 0;
-      font-size: 14px;
-      color: #666;
-      text-transform: uppercase;
-      font-weight: 500;
-    }
+.category {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 16px;
+}
 
-    .component-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 50px;
-    }
+.category:last-child {
+  border-bottom: none;
+}
 
-    .component-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px;
-      background: #f5f5f5;
-      border-radius: 4px;
-      cursor: grab;
-      transition: all 0.2s;
-    }
+.category-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 
-    .component-item:hover {
-      background: #e3f2fd;
-      transform: translateX(4px);
-    }
+.component-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
 
-    .component-item:active {
-      cursor: grabbing;
-    }
+.component-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  background-color: #f8f8f8;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
 
-    .material-icons {
-      font-size: 20px;
-      color: #007bff;
-    }
+.component-item:hover {
+  background-color: #e8f4ff;
+  border-color: #007bff;
+  transform: translateY(-2px);
+}
 
-    .cdk-drag-preview {
-      padding: 12px;
-      background: white;
-      border: 2px solid #007bff;
-      border-radius: 4px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+.component-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
 
-    .cdk-drag-placeholder {
-      opacity: 0;
-    }
-  `]
+.component-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  text-align: center;
+}`]
 })
-export class SidebarComponent {
-  componentDropped = output<CdkDragDrop<any>>();
+export class SidebarComponent implements OnInit {
+  componentsByCategory: Record<string, any[]> = {};
 
-  categories = ['layout', 'content', 'form', 'media'];
-  componentsByCategory = computed(() => this.componentRegistry.componentsByCategory());
+  constructor(
+    private componentRegistry: ComponentRegistryService,
+    private store: Store
+  ) {}
 
-  constructor(private componentRegistry: ComponentRegistryService) {}
+  ngOnInit(): void {
+    this.componentsByCategory = this.componentRegistry.componentsByCategory;
+  }
 
-  onComponentDrop(event: CdkDragDrop<any>) {
-    // This prevents items from being reordered in sidebar
-    // Only emit when dropping to canvas
-    if (event.previousContainer !== event.container) {
-      this.componentDropped.emit(event);
+  onAddComponent(type: string): void {
+    const instance = this.componentRegistry.createInstance(type);
+    if (instance) {
+      this.store.dispatch(EditorActions.addComponent({ component: instance }));
     }
   }
 }

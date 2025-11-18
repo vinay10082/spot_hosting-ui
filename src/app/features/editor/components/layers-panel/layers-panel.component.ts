@@ -1,121 +1,72 @@
-import { Component, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { CdkDragDrop, CdkDropList, CdkDrag, moveItemInArray } from '@angular/cdk/drag-drop';
-import { EditorStateService } from '../../../../core/services/editor-state.service';
-import { ComponentInstance } from '../../../../core/models/component.model';
-import { TreeViewComponent } from '../../../../shared/components/tree-view/tree-view.component';
+import { Component } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { selectComponents, selectSelectedComponentId } from '../../../../store/editor/editor.selector';
+import { EditorActions } from '../../../../store/editor/editor.action';
 
 @Component({
+  standalone: false,
   selector: 'app-layers-panel',
-  standalone: true,
-  imports: [CommonModule, CdkDropList, CdkDrag, TreeViewComponent],
-  template: `
-    <div class="layers-panel">
-      <div class="panel-header">
-        <h3>Layers</h3>
-        <button class="icon-button" (click)="collapseAll()">
-          <span class="material-icons">unfold_less</span>
-        </button>
-      </div>
+  template: `<div class="layers-panel">
+  <h3 class="panel-title">Layers</h3>
 
-      <div class="layers-tree">
-        <app-tree-view
-          [items]="components()"
-          [selectedId]="selectedComponentId()"
-          (itemClick)="onSelectComponent($event)"
-          (itemDrop)="onItemDrop($event)"
-          (itemDuplicate)="onDuplicateComponent($event)"
-          (itemDelete)="onDeleteComponent($event)">
-        </app-tree-view>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .layers-panel {
-      width: 280px;
-      background: white;
-      border-left: 1px solid #e0e0e0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+  <div class="layers-list">
+    <app-tree-view
+      [components]="(components$ | async) || []"
+      [selectedId]="selectedComponentId$ | async"
+      (selectComponent)="onSelectComponent($event)"
+      (deleteComponent)="onDeleteComponent($event)"
+      (duplicateComponent)="onDuplicateComponent($event)">
+    </app-tree-view>
+  </div>
 
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px;
-      border-bottom: 1px solid #e0e0e0;
-    }
+  <div *ngIf="(components$ | async)?.length === 0" class="empty-layers">
+    <p>No components yet</p>
+  </div>
+</div>`,
+  styles: [`.layers-panel {
+  padding: 16px;
+  flex: 0 0 auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
 
-    h3 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
+.panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
 
-    .icon-button {
-      padding: 4px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-    .icon-button:hover {
-      background: #f5f5f5;
-    }
-
-    .material-icons {
-      font-size: 20px;
-      color: #666;
-    }
-
-    .layers-tree {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px;
-    }
-  `]
+.empty-layers {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  color: #999;
+  font-size: 14px;
+}`]
 })
 export class LayersPanelComponent {
-  components = computed(() => this.editorState.components());
-  selectedComponentId = computed(() => this.editorState.selectedComponentId());
+  components$ = this.store.select(selectComponents);
+  selectedComponentId$ = this.store.select(selectSelectedComponentId);
 
-  constructor(private editorState: EditorStateService) {}
+  constructor(private store: Store) {}
 
   onSelectComponent(id: string): void {
-    this.editorState.dispatch({
-      type: 'SELECT_COMPONENT',
-      payload: { id },
-    });
-  }
-
-  onItemDrop(event: { id: string; newParentId?: string; newIndex: number }): void {
-    this.editorState.dispatch({
-      type: 'MOVE_COMPONENT',
-      payload: event,
-    });
-  }
-
-  onDuplicateComponent(id: string): void {
-    this.editorState.dispatch({
-      type: 'DUPLICATE_COMPONENT',
-      payload: { id },
-    });
+    this.store.dispatch(EditorActions.selectComponent({ id }));
   }
 
   onDeleteComponent(id: string): void {
-    this.editorState.dispatch({
-      type: 'DELETE_COMPONENT',
-      payload: { id },
-    });
+    this.store.dispatch(EditorActions.deleteComponent({ id }));
   }
 
-  collapseAll(): void {
-    // Implement collapse all logic
+  onDuplicateComponent(id: string): void {
+    this.store.dispatch(EditorActions.duplicateComponent({ id }));
   }
 }

@@ -1,159 +1,154 @@
-import { Component, signal, input, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { CdkDragDrop, CdkDropList, CdkDrag, CdkDragPlaceholder } from '@angular/cdk/drag-drop';
-import { ComponentInstance } from '../../../../core/models/component.model';
-import { ComponentRendererComponent } from '../../../component-renderer/component-renderer.component';
+import { Component, OnInit } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { selectComponents, selectSelectedComponentId, selectResponsiveMode } from '../../../../store/editor/editor.selector';
+import { EditorActions } from '../../../../store/editor/editor.action';
 
 @Component({
+  standalone: false,
   selector: 'app-editor-canvas',
-  standalone: true,
-  imports: [CommonModule, CdkDropList, CdkDrag, CdkDragPlaceholder, ComponentRendererComponent],
-  template: `
-    <div class="canvas-container" 
-         [class.desktop]="responsiveMode() === 'desktop'" 
-         [class.tablet]="responsiveMode() === 'tablet'"
-         [class.mobile]="responsiveMode() === 'mobile'">
-      <div class="canvas" 
-           cdkDropList
-           id="canvas-root"
-           [cdkDropListData]="components()"
-           [cdkDropListConnectedTo]="sidebarLists"
-           (cdkDropListDropped)="onDrop($event)">
-        @if (components().length === 0) {
-          <div class="empty-state">
-            <span class="material-icons" style="font-size: 48px; color: #ccc; margin-bottom: 16px;">widgets</span>
-            <p>Drag components here to start building</p>
-          </div>
-        }
-        @for (component of components(); track component.id) {
-          <div class="canvas-item"
-               cdkDrag
-               [cdkDragData]="component"
-               (click)="onSelectComponent(component.id)"
-               [class.selected]="selectedComponentId() === component.id">
-            <div class="drag-placeholder" *cdkDragPlaceholder></div>
-            <app-component-renderer
-              [component]="component"
-              [isCanvas]="true"
-              [selectedId]="selectedComponentId()"
-              (selectComponent)="onSelectComponent($event)">
-            </app-component-renderer>
-          </div>
-        }
+  template: `<div class="canvas-wrapper">
+  <div 
+    class="canvas" 
+    [ngClass]="getCanvasClass((responsiveMode$ | async) || 'desktop')">
+    
+    <div 
+      *ngIf="(components$ | async)?.length === 0"
+      class="empty-canvas">
+      <div class="empty-message">
+        <h3>🎨 Start Building</h3>
+        <p>Drag and drop components from the sidebar to get started</p>
       </div>
     </div>
-  `,
-  styles: [`
-    .canvas-container {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      padding: 24px;
-      background: #f5f5f5;
-      overflow: auto;
-      transition: all 0.3s ease;
-    }
 
-    .canvas {
-      background: white;
-      min-height: 600px;
-      width: 100%;
-      padding: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      transition: width 0.3s ease;
-    }
+    <div 
+      cdkDropList
+      class="component-list"
+      (cdkDropListDropped)="onDropComponent($event)">
+      <div
+        *ngFor="let component of components$ | async"
+        cdkDrag
+        [cdkDragData]="component.id"
+        class="canvas-component"
+        [class.selected]="component.id === (selectedComponentId$ | async)"
+        (click)="onSelectComponent(component.id)">
+        <app-component-renderer [component]="component"></app-component-renderer>
+      </div>
+    </div>
+  </div>
+</div>`,
+  styles: [`.canvas-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 20px;
+  min-height: 100%;
+}
 
-    .canvas-container.desktop .canvas {
-      max-width: 1200px;
-    }
+.canvas {
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  min-height: 600px;
+  transition: all 0.3s;
+  position: relative;
+}
 
-    .canvas-container.tablet .canvas {
-      max-width: 768px;
-    }
+.canvas-desktop {
+  width: 100%;
+  max-width: 1200px;
+}
 
-    .canvas-container.mobile .canvas {
-      max-width: 375px;
-    }
+.canvas-tablet {
+  width: 768px;
+}
 
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      min-height: 400px;
-      color: #999;
-      font-size: 18px;
-      border: 2px dashed #ddd;
-      border-radius: 8px;
-    }
+.canvas-mobile {
+  width: 375px;
+}
 
-    .canvas-item {
-      position: relative;
-      transition: all 0.2s;
-      margin-bottom: 8px;
-    }
+.empty-canvas {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: 600px;
+}
 
-    .canvas-item.selected {
-      outline: 2px solid #007bff;
-      outline-offset: 2px;
-      border-radius: 4px;
-    }
+.empty-message {
+  text-align: center;
+  color: #999;
+}
 
-    .canvas-item:hover:not(.selected) {
-      outline: 1px dashed #007bff;
-      outline-offset: 2px;
-      border-radius: 4px;
-    }
+.empty-message h3 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
 
-    .drag-placeholder {
-      background: #e3f2fd;
-      border: 2px dashed #2196f3;
-      min-height: 60px;
-      border-radius: 4px;
-      transition: all 0.3s ease;
-    }
+.empty-message p {
+  font-size: 14px;
+}
 
-    .cdk-drag-preview {
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-      opacity: 0.9;
-      border-radius: 4px;
-    }
+.component-list {
+  min-height: 400px;
+  padding: 20px;
+}
 
-    .cdk-drag-animating {
-      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
-    }
+.canvas-component {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
-    .cdk-drop-list-dragging .cdk-drag {
-      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
-    }
+.canvas-component:hover {
+  border-color: #b3d9ff;
+  background-color: #f0f8ff;
+}
 
-    /* Show drop zone highlight when dragging */
-    .canvas.cdk-drop-list-dragging {
-      background: #f0f8ff;
-      border: 2px dashed #2196f3;
-    }
-  `]
+.canvas-component.selected {
+  border-color: #007bff;
+  background-color: #e6f2ff;
+}
+
+.cdk-drag-preview {
+  opacity: 0.8;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}`]
 })
-export class EditorCanvasComponent {
-  components = input.required<ComponentInstance[]>();
-  selectedComponentId = input<string | null>(null);
-  responsiveMode = input<'desktop' | 'tablet' | 'mobile'>('desktop');
+export class EditorCanvasComponent implements OnInit {
+  components$ = this.store.select(selectComponents);
+  selectedComponentId$ = this.store.select(selectSelectedComponentId);
+  responsiveMode$ = this.store.select(selectResponsiveMode);
 
-  // Connect to all sidebar drop lists
-  sidebarLists = ['sidebar-layout', 'sidebar-content', 'sidebar-form', 'sidebar-media'];
+  constructor(private store: Store) {}
 
-  componentDropped = output<CdkDragDrop<any>>();
-  componentSelected = output<string>();
+  ngOnInit(): void {}
 
-  onDrop(event: CdkDragDrop<any>) {
-    console.log('Canvas drop event:', event);
-    console.log('Previous container:', event.previousContainer.id);
-    console.log('Current container:', event.container.id);
-    this.componentDropped.emit(event);
+  onSelectComponent(id: string): void {
+    this.store.dispatch(EditorActions.selectComponent({ id }));
   }
 
-  onSelectComponent(componentId: string) {
-    this.componentSelected.emit(componentId);
+  onDropComponent(event: CdkDragDrop<any[]>): void {
+    if (event.previousIndex !== event.currentIndex) {
+      const componentId = event.item.data;
+      this.store.dispatch(EditorActions.moveComponent({
+        id: componentId,
+        newIndex: event.currentIndex
+      }));
+    }
+  }
+
+  getCanvasClass(mode: string): string {
+    return `canvas-${mode}`;
   }
 }
